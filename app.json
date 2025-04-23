@@ -32,6 +32,22 @@
       "eas": {
         "projectId": "07b2328f-efab-405d-9b4c-4330a51b973e"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true,
+          "useSQLCipher": true,
+          "android": {
+            "enableFTS": false,
+            "useSQLCipher": false
+          },
+          "ios": {
+            "customBuildFlags": ["-DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_ENABLE_SNAPSHOT=1"]
+          }
+        }
+      ]
+    ]
   }
 }

@@ -10,6 +10,7 @@ import {BottomMenu} from "./ui/BottomMenu";
 import {IMonth} from "./types/IMonth";
 import {IDay} from "./types/IDay";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {initDB} from "./database/database";
 
 export type RootStackParamList = {
     MonthScreen: { month: IMonth };
@@ -34,7 +35,9 @@ export function App() {
     if (isLoading) {
         return <LoadScreen />;
     }
-
+    useEffect(() => {
+        initDB(); // инициализируем БД при старте
+    }, []);
     return (
         <StrictMode>
             <QueryClientProvider client={queryClient}>
