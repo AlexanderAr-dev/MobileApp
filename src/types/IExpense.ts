@@ -1,4 +1,5 @@
 export interface IExpense {
+    id: number;
     time: string;
     category: string;
     description: string;

@@ -1,7 +1,12 @@
 import {StyleSheet, View, Text, Button} from "react-native";
 import {IExpense} from "../types/IExpense";
+import {StackNavigationProp} from "@react-navigation/stack";
+import {RootStackParamList} from "../App";
+import {useNavigation} from "@react-navigation/native";
 
 export  function  ExpenseItem(props: IExpense) {
+    type NavigationProp = StackNavigationProp<RootStackParamList, 'DayScreen'>;
+    const navigation = useNavigation<NavigationProp>();
 
     return (
         <View style={styles.container}>
@@ -27,6 +32,11 @@ export  function  ExpenseItem(props: IExpense) {
                 <Text style={styles.costText}>
                     {props.cost}
                 </Text>
+            </View>
+            <View style={styles.btnMore}>
+                <Button
+                    title={'Подробнее'}
+                    onPress={() => navigation.navigate('ExpenseScreen', {expense: props})} />
             </View>
         </View>
     )
@@ -93,4 +103,8 @@ const styles = StyleSheet.create({
     costText: {
         fontSize: 18,
     },
+    btnMore: {
+        width: 151,
+        alignSelf: "flex-end",
+    }
 });

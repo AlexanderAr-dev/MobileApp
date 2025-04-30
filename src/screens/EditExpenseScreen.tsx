@@ -8,83 +8,67 @@ import {
     Alert,
 } from "react-native";
 import { CheckBoxWithText } from "../ui/CheckBoxWithText";
-import {useEffect, useState} from "react";
-import {RouteProp, useNavigation, useRoute} from "@react-navigation/native";
+import { useEffect, useState } from "react";
+import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "../App";
-import {addExpense} from "../utils/database";
-import * as Location from "expo-location";
-import MapView, {MapPressEvent, Marker} from "react-native-maps";
+import { updateExpense } from "../utils/database";
+import MapView, { Marker } from "react-native-maps";
 
-type NavigationProp = StackNavigationProp<RootStackParamList, "CreateExpenseScreen">;
-type Route = RouteProp<RootStackParamList, "CreateExpenseScreen">;
+type NavigationProp = StackNavigationProp<RootStackParamList, "EditExpenseScreen">;
+type Route = RouteProp<RootStackParamList, "EditExpenseScreen">;
 
-
-export function CreateExpenseScreen() {
+export function EditExpenseScreen() {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute<Route>();
-    const { dayId } = route.params ?? {};
+    const { expense } = route.params;
 
     const [title, setTitle] = useState("");
     const [amount, setAmount] = useState("");
-    const [category, setCategory] = useState("Не указано");
+    const [category, setCategory] = useState("Остальное");
     const [isAffecting, setIsAffecting] = useState(true);
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
     useEffect(() => {
-        (async () => {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== "granted") {
-                console.log("Разрешение отклонено");
-                return;
+        if (expense) {
+            setTitle(expense.description);
+            setAmount(String(expense.cost));
+            setCategory(expense.category || "Остальное");
+            setIsAffecting(expense.affect);
+            if (expense.location && expense.location !== "не указано") {
+                const [lat, lng] = expense.location.split(",").map(Number);
+                setLocation({ latitude: lat, longitude: lng });
             }
-            const pos = await Location.getCurrentPositionAsync({});
-            const coords = {
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-            };
-            setLocation(coords);
-        })();
-    }, []);
+        }
+    }, [expense]);
 
-    const handleMapPress = (e: MapPressEvent) => {
-        setLocation(e.nativeEvent.coordinate);
-    };
-
-    if (!dayId) {
-        return (
-            <SafeAreaView>
-                <Text>Ошибка: не передан dayId</Text>
-            </SafeAreaView>
-        );
-    }
-
-    const handleSubmit = async () => {
+    const handleUpdate = async () => {
         const cost = parseFloat(amount);
         if (!title || isNaN(cost)) {
             Alert.alert("Ошибка", "Заполните название и сумму.");
             return;
         }
 
-        const now = new Date();
-        const time = now.toTimeString().slice(0, 5); // ISO-формат времени
+        const updated = {
+            time: new Date().toTimeString().slice(0, 5),
+            category,
+            description: title,
+            cost,
+            location: location
+                ? `${location.latitude},${location.longitude}`
+                : "не указано",
+            affect: isAffecting,
+        };
 
         try {
-            await addExpense({
-                time,
-                category,
-                description: title,
-                cost,
-                location: location
-                    ? `${location.latitude},${location.longitude}`
-                    : "не указано",
-                affect: isAffecting,
-            }, dayId,);
-            navigation.goBack(); // ⬅️ Возврат на DayScreen
+            await updateExpense(expense.id, updated);
+            navigation.navigate("ExpenseScreen", { expense: expense });
         } catch (e) {
-            Alert.alert("Ошибка при добавлении", String(e));
+            Alert.alert("Ошибка при обновлении", String(e));
         }
     };
+
+
 
     return (
         <SafeAreaView style={styles.pageContainer}>
@@ -92,15 +76,12 @@ export function CreateExpenseScreen() {
                 <View style={styles.inputs}>
                     <Text style={styles.inputsText}>Название расхода</Text>
                     <TextInput
-                        placeholderTextColor="black"
                         style={styles.input}
                         value={title}
                         onChangeText={setTitle}
                     />
-
                     <Text style={styles.inputsText}>Сумма</Text>
                     <TextInput
-                        placeholderTextColor="black"
                         style={styles.input}
                         value={amount}
                         onChangeText={setAmount}
@@ -113,12 +94,10 @@ export function CreateExpenseScreen() {
                     <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
                         {["Транспорт", "Продукты", "Развлечения", "Остальное", "Переводы"].map((cat) => (
                             <TouchableOpacity key={cat} onPress={() => setCategory(cat)}>
-                                <View
-                                    style={[
-                                        styles.categoryItem,
-                                        category === cat && { backgroundColor: "#ccc" },
-                                    ]}
-                                >
+                                <View style={[
+                                    styles.categoryItem,
+                                    category === cat && { backgroundColor: "#ccc" },
+                                ]}>
                                     <Text>{cat}</Text>
                                 </View>
                             </TouchableOpacity>
@@ -127,7 +106,7 @@ export function CreateExpenseScreen() {
                 </View>
 
                 <View style={styles.mapContainer}>
-                    <Text style={[styles.inputsText, { marginTop: 15 }]}>Выберите место</Text>
+                    <Text style={[styles.inputsText, { marginTop: 15 }]}>Место</Text>
                     {location && (
                         <MapView
                             style={{ width: "100%", height: 200 }}
@@ -137,7 +116,8 @@ export function CreateExpenseScreen() {
                                 latitudeDelta: 0.01,
                                 longitudeDelta: 0.01,
                             }}
-                            onPress={handleMapPress}
+                            scrollEnabled={false}
+                            zoomEnabled={false}
                         >
                             <Marker coordinate={location} />
                         </MapView>
@@ -153,8 +133,8 @@ export function CreateExpenseScreen() {
                 </View>
 
                 <View style={styles.btnAgree}>
-                    <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-                        <Text style={styles.buttonText}>+</Text>
+                    <TouchableOpacity style={styles.button} onPress={handleUpdate}>
+                        <Text style={styles.buttonText}>Сохранить</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -193,7 +173,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     inputsText: {
-       fontSize: 18,
+        fontSize: 18,
     },
     input: {
         width: 258,

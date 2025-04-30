@@ -1,53 +1,52 @@
-import {Button, SafeAreaView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {NavigationProp, useNavigation, useRoute} from "@react-navigation/native";
-import {IDay} from "../types/IDay";
-import {ListOfExpense} from "../elements/ListOfExpense";
-import {StackNavigationProp} from "@react-navigation/stack";
-import {RootStackParamList} from "../App";
+import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation, useRoute } from "@react-navigation/native";
+import { IDay } from "../types/IDay";
+import { ListOfExpense } from "../elements/ListOfExpense";
+import { StackNavigationProp } from "@react-navigation/stack";
 
 export function DayScreen() {
     const route = useRoute();
-    type NavigationProp = StackNavigationProp<RootStackParamList, 'CreateExpenseScreen'>;
-    const navigation = useNavigation<NavigationProp>();
-    const { day } = route.params as { day?: IDay } || {};
+    const { day } = route.params as { day: IDay };
+    const navigation = useNavigation<StackNavigationProp<any>>(); // Замените на ваш тип RootStackParamList
+
+    if (!day) {
+        return <Text>Данные дня не найдены</Text>;
+    }
 
     return (
         <SafeAreaView style={styles.pageContainer}>
             <View style={styles.container}>
-                <View  style={styles.nameDay}>
-                    <Text style={styles.nameDayText}>
-                        {day.date}
+                <View style={styles.nameDay}>
+                    <Text style={styles.nameDayText}>{day.date}</Text>
+                </View>
+
+                <View style={styles.perDay}>
+                    <Text style={styles.perDayText}>Расходы за день</Text>
+                </View>
+                <View style={[styles.sumContainer, { backgroundColor: "rgba(218,58,58,0.78)" }]}>
+                    <Text style={styles.sumText}>
+                        {day.expenseSum ? day.expenseSum.toFixed(2) : '0.00'}
                     </Text>
                 </View>
 
                 <View style={styles.perDay}>
-                    <Text style={styles.perDayText}>
-                        Расходы за день
-                    </Text>
+                    <Text style={styles.perDayText}>Доходы за день</Text>
                 </View>
-                <View style={[styles.sumContainer, {backgroundColor: "rgba(218,58,58,0.78)"}]}>
+                <View style={[styles.sumContainer, { backgroundColor: "#7df42d" }]}>
                     <Text style={styles.sumText}>
-                        {day.expenseSum}
-                    </Text>
-                </View>
-
-                <View style={styles.perDay}>
-                    <Text style={styles.perDayText}>
-                        Доходы за день
-                    </Text>
-                </View>
-                <View style={[styles.sumContainer, {backgroundColor: "#7df42d"}]}>
-                    <Text style={styles.sumText}>
-                        {day.incomeSum}
+                        {day.incomeSum ? day.incomeSum.toFixed(2) : '0.00'}
                     </Text>
                 </View>
             </View>
+
             <View style={styles.btnAgree}>
-                <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('CreateExpenseScreen')}>
+                <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('CreateExpenseScreen', {dayId: day.id})}>
                     <Text style={styles.buttonText}>+</Text>
                 </TouchableOpacity>
             </View>
-            <ListOfExpense expenses={day.expenses}/>
+
+            {/* Список расходов */}
+            <ListOfExpense currentDay={day.id} />
         </SafeAreaView>
     );
 }

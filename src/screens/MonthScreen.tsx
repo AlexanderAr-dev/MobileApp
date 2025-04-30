@@ -7,7 +7,13 @@ import {useState} from "react";
 
 export function MonthScreen() {
     const route = useRoute();
-    const { month } = route.params as { month?: IMonth } || {};
+    const { month } = route.params as { month: IMonth };
+
+    // Проверка на отсутствие данных месяца
+    if (!month) {
+        return <Text>Данные месяца не найдены</Text>;
+    }
+
     const [isVisible, setIsVisible] = useState(false);
 
     return (
@@ -80,7 +86,7 @@ export function MonthScreen() {
                     </View>
                 </View>
             </View>
-            <ListOfDays days={month.days} />
+            <ListOfDays currentMonth={month.id}/>
         </SafeAreaView>
     );
 }
