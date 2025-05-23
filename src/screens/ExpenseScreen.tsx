@@ -7,29 +7,17 @@ import {
     View,
 } from "react-native";
 import { CheckBoxWithText } from "../ui/CheckBoxWithText";
-import {NavigationProp, useNavigation, useRoute} from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import MapView, {MapPressEvent, Marker} from "react-native-maps";
+import { WebView } from 'react-native-webview';
 
-import {IExpense} from "../types/IExpense";
-import {deleteExpense} from "../utils/database";
-import {useContext} from "react";
-
+import { IExpense } from "../types/IExpense";
+import { deleteExpense } from "../utils/database";
 
 export function ExpenseScreen() {
     const route = useRoute();
     const { expense } = route.params as { expense: IExpense };
-    const navigation = useNavigation<StackNavigationProp<any>>(); // Замените на ваш тип RootStackParamList
-//     const parseLocation = (locationString: string) => {
-//         const [lat, lng] = locationString.split(',').map(Number);
-//         return {
-//             latitude: lat,
-//             longitude: lng,
-//         };
-//     };
-//
-// // Предположим, это строка из базы
-//     const location = parseLocation(expense.location); // например, "55.75,37.61"
+    const navigation = useNavigation<StackNavigationProp<any>>();
 
     const handleDelete = async () => {
         Alert.alert("Удаление", "Вы уверены, что хотите удалить расход?", [
@@ -40,7 +28,7 @@ export function ExpenseScreen() {
                 onPress: async () => {
                     try {
                         await deleteExpense(expense.id);
-                        navigation.navigate("MainScreen"); // ✅ возвращаемся к дню
+                        navigation.navigate("MainScreen");
                     } catch (e) {
                         Alert.alert("Ошибка при удалении", String(e));
                     }
@@ -49,54 +37,30 @@ export function ExpenseScreen() {
         ]);
     };
 
+    const getMapUrl = () => {
+        if (!expense.location || expense.location === "не указано") return null;
 
-    if (!expense) {
-        return <Text>Данные расхода не найдены</Text>;
-    }
+        const [lat, lon] = expense.location.split(",");
+        return `https://maps.google.com/maps?q=${lat},${lon}&z=15&output=embed`;
+    };
 
+    const mapUrl = getMapUrl();
 
     return (
         <SafeAreaView style={styles.pageContainer}>
             <View style={styles.container}>
                 <View style={styles.inputs}>
                     <Text style={styles.inputsText}>Название расхода</Text>
-                    <Text
-                        style={styles.input}
-                    >
-                        {expense.description}
-                    </Text>
+                    <Text style={styles.input}>{expense.description}</Text>
+
                     <Text style={styles.inputsText}>Сумма</Text>
-                    <Text
-                        style={styles.input}
-                    >
-                        {expense.cost}
-                    </Text>/
+                    <Text style={styles.input}>{expense.cost}</Text>
                 </View>
 
                 <View style={styles.categoryContainer}>
                     <Text style={styles.inputsText}>Категория</Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
-                        <Text>
-                            {expense.category}
-                        </Text>
-                    </View>
+                    <Text>{expense.category}</Text>
                 </View>
-
-                {/*<View style={styles.mapContainer}>*/}
-                {/*    <Text style={styles.inputsText}>Местоположение</Text>*/}
-                {/*    <MapView*/}
-                {/*        style={{ width: '100%', height: 200 }}*/}
-                {/*        region={{*/}
-                {/*            ...location,*/}
-                {/*            latitudeDelta: 0.01,*/}
-                {/*            longitudeDelta: 0.01,*/}
-                {/*        }}*/}
-                {/*        scrollEnabled={false}*/}
-                {/*        zoomEnabled={false}*/}
-                {/*    >*/}
-                {/*        <Marker coordinate={location} />*/}
-                {/*    </MapView>*/}
-                {/*</View>*/}
 
                 <View style={styles.check}>
                     <CheckBoxWithText
@@ -104,6 +68,16 @@ export function ExpenseScreen() {
                         checked={expense.affect}
                     />
                 </View>
+
+                {mapUrl && (
+                    <View style={styles.mapContainer}>
+                        <Text style={styles.inputsText}>Местоположение</Text>
+                        <WebView
+                            source={{ uri: mapUrl }}
+                            style={styles.map}
+                        />
+                    </View>
+                )}
 
                 <View style={styles.btnAgree}>
                     <TouchableOpacity style={styles.button} onPress={() => navigation.navigate("EditExpenseScreen", { expense })}>
@@ -120,7 +94,7 @@ export function ExpenseScreen() {
     );
 }
 
-const styless = StyleSheet.create({
+const styles = StyleSheet.create({
     pageContainer: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -179,6 +153,10 @@ const styless = StyleSheet.create({
         width: "100%",
         paddingHorizontal: 20,
         marginTop: 20,
+    },
+    map: {
+        flex: 1,
+        borderRadius: 10,
     },
     logo: {
         width: 240,

@@ -39,7 +39,7 @@ export default function QuickCreate({ monthId }: { monthId: number }) { // Пр�
                     category: 'Не указано',
                     description: title,
                     cost: parseFloat(cost),
-                    location: '',
+                    location: null,
                     affect: !isAgreed,
                 },
                 dayId

@@ -32,11 +32,6 @@ export function DayScreen() {
                 <View style={styles.perDay}>
                     <Text style={styles.perDayText}>Доходы за день</Text>
                 </View>
-                <View style={[styles.sumContainer, { backgroundColor: "#7df42d" }]}>
-                    <Text style={styles.sumText}>
-                        {day.incomeSum ? day.incomeSum.toFixed(2) : '0.00'}
-                    </Text>
-                </View>
             </View>
 
             <View style={styles.btnAgree}>

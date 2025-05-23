@@ -45,7 +45,6 @@ export function ListOfDays({ currentMonth }: ListOfDaysProps) {
                 <DayItem
                     id={item.id}
                     date={item.date}
-                    incomeSum={item.incomeSum}
                     expenseSum={item.expenseSum}
                     expenses={item.expenses}
                 />

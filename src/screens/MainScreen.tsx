@@ -10,7 +10,7 @@ export function MainScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <QuickCreate monthId={ monthId}/>
+            <QuickCreate monthId={ monthId }/>
             <ListOfMonth />
         </SafeAreaView>
     );

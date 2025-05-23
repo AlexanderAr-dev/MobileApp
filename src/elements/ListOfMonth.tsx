@@ -38,8 +38,6 @@ export default function ListOfMonth() {
             <MonthItem
                 id={item.id}
                 nameMonth={item.nameMonth}
-                budgetMonth={item.budgetMonth}
-                sumOnDay={item.sumOnDay}
                 spent={item.spent}
                 days={item.days}
             />

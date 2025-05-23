@@ -32,11 +32,6 @@ export  function  DayItem(props: IDay) {
                     Доходы за день
                 </Text>
             </View>
-            <View style={[styles.sumContainer, {backgroundColor: "#7df42d"}]}>
-                <Text style={styles.sumText}>
-                    {props.incomeSum}
-                </Text>
-            </View>
             <View style={styles.btnMore}>
                 <Button
                     title={'Подробнее'}

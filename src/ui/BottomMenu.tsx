@@ -22,17 +22,6 @@ export const BottomMenu = () => {
                     style={styles.icon}
                 />
             </TouchableOpacity>
-
-            {/* Переход на MonthScreen */}
-            <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => alert('Вы были перекинуты на текущий месяц')}
-            >
-                <Image
-                    source={require("../assets/CalendarIcon.png")}
-                    style={styles.icon}
-                />
-            </TouchableOpacity>
         </View>
     );
 };

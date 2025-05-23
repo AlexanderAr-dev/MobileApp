@@ -6,4 +6,5 @@ export interface IExpense {
     cost: number;
     location: string;
     affect: boolean;
+    dayId: number;
 }

@@ -1,28 +1,25 @@
+import React, { useState, useEffect } from "react";
 import {
+    Alert,
+    Modal,
     SafeAreaView,
-    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
-    Alert,
 } from "react-native";
-import { CheckBoxWithText } from "../ui/CheckBoxWithText";
-import {useEffect, useState} from "react";
-import {RouteProp, useNavigation, useRoute} from "@react-navigation/native";
-import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "../App";
-import {addExpense} from "../utils/database";
 import * as Location from "expo-location";
-import MapView, {MapPressEvent, Marker} from "react-native-maps";
-
-type NavigationProp = StackNavigationProp<RootStackParamList, "CreateExpenseScreen">;
-type Route = RouteProp<RootStackParamList, "CreateExpenseScreen">;
+import { WebView } from "react-native-webview";
+import { NavigationProp, useNavigation } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
+import {addExpense} from "../utils/database";
+import {CheckBoxWithText} from "../ui/CheckBoxWithText";
+import { StyleSheet } from "react-native";
 
 
 export function CreateExpenseScreen() {
-    const navigation = useNavigation<NavigationProp>();
-    const route = useRoute<Route>();
+    const navigation = useNavigation<NavigationProp<any>>();
+    const route = useRoute<any>();
     const { dayId } = route.params ?? {};
 
     const [title, setTitle] = useState("");
@@ -30,6 +27,7 @@ export function CreateExpenseScreen() {
     const [category, setCategory] = useState("Не указано");
     const [isAffecting, setIsAffecting] = useState(true);
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     useEffect(() => {
         (async () => {
@@ -47,18 +45,6 @@ export function CreateExpenseScreen() {
         })();
     }, []);
 
-    const handleMapPress = (e: MapPressEvent) => {
-        setLocation(e.nativeEvent.coordinate);
-    };
-
-    if (!dayId) {
-        return (
-            <SafeAreaView>
-                <Text>Ошибка: не передан dayId</Text>
-            </SafeAreaView>
-        );
-    }
-
     const handleSubmit = async () => {
         const cost = parseFloat(amount);
         if (!title || isNaN(cost)) {
@@ -67,24 +53,63 @@ export function CreateExpenseScreen() {
         }
 
         const now = new Date();
-        const time = now.toTimeString().slice(0, 5); // ISO-формат времени
+        const time = now.toTimeString().slice(0, 5);
 
         try {
-            await addExpense({
-                time,
-                category,
-                description: title,
-                cost,
-                location: location
-                    ? `${location.latitude},${location.longitude}`
-                    : "не указано",
-                affect: isAffecting,
-            }, dayId,);
-            navigation.goBack(); // ⬅️ Возврат на DayScreen
+            await addExpense(
+                {
+                    time,
+                    category,
+                    description: title,
+                    cost,
+                    location: location
+                        ? `${location.latitude},${location.longitude}`
+                        : "не указано",
+                    affect: isAffecting,
+                },
+                dayId
+            );
+            navigation.goBack();
         } catch (e) {
             Alert.alert("Ошибка при добавлении", String(e));
         }
     };
+
+    const leafletHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Map</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+      <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+      <script>
+        const map = L.map('map').setView([${location?.latitude ?? 55.751244}, ${location?.longitude ?? 37.618423}], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const marker = L.marker([${location?.latitude ?? 55.751244}, ${location?.longitude ?? 37.618423}], {draggable: true}).addTo(map);
+
+        map.on('click', function(e) {
+          marker.setLatLng(e.latlng);
+          window.ReactNativeWebView.postMessage(JSON.stringify(e.latlng));
+        });
+
+        marker.on('dragend', function(e) {
+          const coords = marker.getLatLng();
+          window.ReactNativeWebView.postMessage(JSON.stringify(coords));
+        });
+      </script>
+    </body>
+    </html>
+  `;
 
     return (
         <SafeAreaView style={styles.pageContainer}>
@@ -92,15 +117,12 @@ export function CreateExpenseScreen() {
                 <View style={styles.inputs}>
                     <Text style={styles.inputsText}>Название расхода</Text>
                     <TextInput
-                        placeholderTextColor="black"
                         style={styles.input}
                         value={title}
                         onChangeText={setTitle}
                     />
-
                     <Text style={styles.inputsText}>Сумма</Text>
                     <TextInput
-                        placeholderTextColor="black"
                         style={styles.input}
                         value={amount}
                         onChangeText={setAmount}
@@ -108,55 +130,61 @@ export function CreateExpenseScreen() {
                     />
                 </View>
 
-                <View style={styles.categoryContainer}>
-                    <Text style={styles.inputsText}>Категория</Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
-                        {["Транспорт", "Продукты", "Развлечения", "Остальное", "Переводы"].map((cat) => (
-                            <TouchableOpacity key={cat} onPress={() => setCategory(cat)}>
-                                <View
-                                    style={[
-                                        styles.categoryItem,
-                                        category === cat && { backgroundColor: "#ccc" },
-                                    ]}
-                                >
-                                    <Text>{cat}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                <Text style={styles.inputsText}>Категория</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
+                    {["Транспорт", "Продукты", "Развлечения", "Остальное", "Переводы"].map((cat) => (
+                        <TouchableOpacity key={cat} onPress={() => setCategory(cat)}>
+                            <View style={[
+                                styles.categoryItem,
+                                category === cat && { backgroundColor: "#ccc" },
+                            ]}>
+                                <Text>{cat}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
-                <View style={styles.mapContainer}>
-                    <Text style={[styles.inputsText, { marginTop: 15 }]}>Выберите место</Text>
-                    {location && (
-                        <MapView
-                            style={{ width: "100%", height: 200 }}
-                            initialRegion={{
-                                latitude: location.latitude,
-                                longitude: location.longitude,
-                                latitudeDelta: 0.01,
-                                longitudeDelta: 0.01,
-                            }}
-                            onPress={handleMapPress}
-                        >
-                            <Marker coordinate={location} />
-                        </MapView>
-                    )}
-                </View>
+                <Text style={styles.inputsText}>Местоположение</Text>
+                <TouchableOpacity
+                    onPress={() => setModalVisible(true)}
+                    style={{ backgroundColor: "#eee", padding: 12, marginVertical: 10, borderRadius: 10 }}
+                >
+                    <Text>{location ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}` : "Выбрать на карте"}</Text>
+                </TouchableOpacity>
 
-                <View style={styles.check}>
-                    <CheckBoxWithText
-                        label="Влияет на бюджет?"
-                        checked={isAffecting}
-                        onChange={setIsAffecting}
-                    />
-                </View>
+                <CheckBoxWithText
+                    label="Влияет на бюджет?"
+                    checked={isAffecting}
+                    onChange={setIsAffecting}
+                />
 
                 <View style={styles.btnAgree}>
                     <TouchableOpacity style={styles.button} onPress={handleSubmit}>
                         <Text style={styles.buttonText}>+</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* 📍 МОДАЛЬНОЕ ОКНО С КАРТОЙ */}
+                <Modal visible={modalVisible} animationType="slide">
+                    <SafeAreaView style={{ flex: 1 }}>
+                        <WebView
+                            originWhitelist={['*']}
+                            source={{ html: leafletHtml }}
+                            javaScriptEnabled
+                            onMessage={(event) => {
+                                const coords = JSON.parse(event.nativeEvent.data);
+                                setLocation({ latitude: coords.lat, longitude: coords.lng });
+                                setModalVisible(false);
+                            }}
+                        />
+                        <TouchableOpacity
+                            onPress={() => setModalVisible(false)}
+                            style={{ padding: 16, backgroundColor: "#f00" }}
+                        >
+                            <Text style={{ color: "white", textAlign: "center" }}>Закрыть</Text>
+                        </TouchableOpacity>
+                    </SafeAreaView>
+                </Modal>
             </View>
         </SafeAreaView>
     );
@@ -218,9 +246,17 @@ const styles = StyleSheet.create({
         padding: 5,
     },
     mapContainer: {
-        width: "100%",
-        paddingHorizontal: 20,
         marginTop: 20,
+        alignItems: "center",
+        justifyContent: "center",
+        height: 200,
+        borderRadius: 10,
+        overflow: "hidden",
+    },
+
+    map: {
+        width: "100%",
+        height: "100%",
     },
     logo: {
         width: 240,

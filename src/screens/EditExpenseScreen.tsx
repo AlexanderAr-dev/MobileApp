@@ -1,19 +1,24 @@
+import React, { useEffect, useState } from "react";
 import {
     SafeAreaView,
-    StyleSheet,
+    View,
     Text,
     TextInput,
     TouchableOpacity,
-    View,
     Alert,
+    Modal,
 } from "react-native";
-import { CheckBoxWithText } from "../ui/CheckBoxWithText";
-import { useEffect, useState } from "react";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "../App";
-import { updateExpense } from "../utils/database";
-import MapView, { Marker } from "react-native-maps";
+import { RouteProp } from "@react-navigation/native";
+import { WebView } from "react-native-webview";
+
+import {RootStackParamList} from "../App";
+import {CheckBoxWithText} from "../ui/CheckBoxWithText";
+import { StyleSheet } from "react-native";
+import {updateExpense} from "../utils/database";
+
+
 
 type NavigationProp = StackNavigationProp<RootStackParamList, "EditExpenseScreen">;
 type Route = RouteProp<RootStackParamList, "EditExpenseScreen">;
@@ -28,6 +33,7 @@ export function EditExpenseScreen() {
     const [category, setCategory] = useState("Остальное");
     const [isAffecting, setIsAffecting] = useState(true);
     const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [modalVisible, setModalVisible] = useState(false);
 
     useEffect(() => {
         if (expense) {
@@ -62,13 +68,47 @@ export function EditExpenseScreen() {
 
         try {
             await updateExpense(expense.id, updated);
-            navigation.navigate("ExpenseScreen", { expense: expense });
+            navigation.navigate("ExpenseScreen", { expense: { ...expense, ...updated } });
         } catch (e) {
             Alert.alert("Ошибка при обновлении", String(e));
         }
     };
 
+    const leafletHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Map</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+      <style>
+        html, body, #map { height: 100%; margin: 0; padding: 0; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+      <script>
+        const map = L.map('map').setView([${location?.latitude ?? 55.751244}, ${location?.longitude ?? 37.618423}], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
+        const marker = L.marker([${location?.latitude ?? 55.751244}, ${location?.longitude ?? 37.618423}], {draggable: true}).addTo(map);
+
+        map.on('click', function(e) {
+          marker.setLatLng(e.latlng);
+          window.ReactNativeWebView.postMessage(JSON.stringify(e.latlng));
+        });
+
+        marker.on('dragend', function(e) {
+          const coords = marker.getLatLng();
+          window.ReactNativeWebView.postMessage(JSON.stringify(coords));
+        });
+      </script>
+    </body>
+    </html>
+  `;
 
     return (
         <SafeAreaView style={styles.pageContainer}>
@@ -105,24 +145,13 @@ export function EditExpenseScreen() {
                     </View>
                 </View>
 
-                <View style={styles.mapContainer}>
-                    <Text style={[styles.inputsText, { marginTop: 15 }]}>Место</Text>
-                    {location && (
-                        <MapView
-                            style={{ width: "100%", height: 200 }}
-                            initialRegion={{
-                                latitude: location.latitude,
-                                longitude: location.longitude,
-                                latitudeDelta: 0.01,
-                                longitudeDelta: 0.01,
-                            }}
-                            scrollEnabled={false}
-                            zoomEnabled={false}
-                        >
-                            <Marker coordinate={location} />
-                        </MapView>
-                    )}
-                </View>
+                <Text style={styles.inputsText}>Местоположение</Text>
+                <TouchableOpacity
+                    onPress={() => setModalVisible(true)}
+                    style={{ backgroundColor: "#eee", padding: 12, marginVertical: 10, borderRadius: 10 }}
+                >
+                    <Text>{location ? `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}` : "Выбрать на карте"}</Text>
+                </TouchableOpacity>
 
                 <View style={styles.check}>
                     <CheckBoxWithText
@@ -137,6 +166,28 @@ export function EditExpenseScreen() {
                         <Text style={styles.buttonText}>Сохранить</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Модальное окно с WebView-картой */}
+                <Modal visible={modalVisible} animationType="slide">
+                    <SafeAreaView style={{ flex: 1 }}>
+                        <WebView
+                            originWhitelist={['*']}
+                            source={{ html: leafletHtml }}
+                            javaScriptEnabled
+                            onMessage={(event) => {
+                                const coords = JSON.parse(event.nativeEvent.data);
+                                setLocation({ latitude: coords.lat, longitude: coords.lng });
+                                setModalVisible(false);
+                            }}
+                        />
+                        <TouchableOpacity
+                            onPress={() => setModalVisible(false)}
+                            style={{ padding: 16, backgroundColor: "#f00" }}
+                        >
+                            <Text style={{ color: "white", textAlign: "center" }}>Закрыть</Text>
+                        </TouchableOpacity>
+                    </SafeAreaView>
+                </Modal>
             </View>
         </SafeAreaView>
     );
@@ -216,7 +267,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     button: {
-        width: 70,
+        width: "auto",
         height: 38,
         backgroundColor: "#2DA1F4",
         paddingVertical: 5,

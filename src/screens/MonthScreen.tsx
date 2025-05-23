@@ -70,16 +70,6 @@ export function MonthScreen() {
                     <View style={{alignItems: 'center'}}>
                         <View style={styles.info}>
                             <Text style={styles.infoText}>
-                                Бюджет: {month.budgetMonth}
-                            </Text>
-                        </View>
-                        <View style={styles.info}>
-                            <Text style={styles.infoText}>
-                                Сумма на день: {month.sumOnDay}
-                            </Text>
-                        </View>
-                        <View style={styles.info}>
-                            <Text style={styles.infoText}>
                                 Потрачено: {month.spent}
                             </Text>
                         </View>

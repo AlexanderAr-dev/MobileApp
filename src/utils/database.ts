@@ -1,7 +1,7 @@
 import { openDatabaseAsync, SQLiteDatabase } from 'expo-sqlite';
 import { IExpense } from '../types/IExpense';
 import { IDay } from '../types/IDay';
-import {IMonth} from "../types/IMonth";
+import { IMonth } from "../types/IMonth";
 
 let db: SQLiteDatabase | null = null;
 
@@ -14,16 +14,13 @@ export const initDB = async () => {
     CREATE TABLE IF NOT EXISTS months (
       id INTEGER PRIMARY KEY NOT NULL,
       nameMonth TEXT NOT NULL,
-      budgetMonth REAL,
-      sumOnDay REAL,
-      spent REAL
+      spent REAL -- 🔧 убрано: budgetMonth, sumOnDay
     );
 
     CREATE TABLE IF NOT EXISTS days (
       id INTEGER PRIMARY KEY NOT NULL,
       date TEXT NOT NULL,
-      incomeSum REAL,
-      expenseSum REAL,
+      expenseSum REAL, -- 🔧 убрано: incomeSum
       monthId INTEGER,
       FOREIGN KEY (monthId) REFERENCES months(id) ON DELETE CASCADE
     );
@@ -59,8 +56,8 @@ export const ensureCurrentMonthExists = async () => {
 
     if (!existing) {
         const result = await db.runAsync(
-            `INSERT INTO months (nameMonth, budgetMonth, sumOnDay, spent) VALUES (?, ?, ?, ?)`,
-            [nameMonth, 0, 0, 0]
+            `INSERT INTO months (nameMonth, spent) VALUES (?, ?)`, // 🔧 убрано: budgetMonth, sumOnDay
+            [nameMonth, 0]
         );
         monthId = result.lastInsertRowId!;
         console.log(`✅ Добавлен месяц: ${nameMonth}`);
@@ -83,8 +80,8 @@ export const ensureTodayExists = async (monthId: number) => {
 
     if (!existing) {
         await db.runAsync(
-            `INSERT INTO days (date, incomeSum, expenseSum, monthId) VALUES (?, ?, ?, ?)`,
-            [today, 0, 0, monthId]
+            `INSERT INTO days (date, expenseSum, monthId) VALUES (?, ?, ?)`, // 🔧 убрано: incomeSum
+            [today, 0, monthId]
         );
         console.log(`📅 Добавлен день: ${today}`);
     }
@@ -93,35 +90,34 @@ export const ensureTodayExists = async (monthId: number) => {
 export const getOrCreateTodayDayId = async (monthId: number): Promise<number | null> => {
     if (!db) db = await openDatabaseAsync('months.db');
 
-    const today = new Date().toISOString().split('T')[0]; // Получаем текущую дату в формате YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
 
-    // Проверим, существует ли день для текущей даты в базе данных
     const existing = await db.getFirstAsync<{ id: number }>(
         `SELECT id FROM days WHERE date = ? AND monthId = ?`,
         [today, monthId]
     );
 
     if (existing) {
-        return existing.id; // Если день существует, возвращаем его ID
+        return existing.id;
     }
 
-    // Если день не существует, создаём новый
     const result = await db.runAsync(
-        `INSERT INTO days (date, incomeSum, expenseSum, monthId) VALUES (?, ?, ?, ?)`,
-        [today, 0, 0, monthId]
+        `INSERT INTO days (date, expenseSum, monthId) VALUES (?, ?, ?)`,
+        [today, 0, monthId]
     );
 
     const newDayId = result.lastInsertRowId!;
     console.log(`📅 Добавлен день: ${today}`);
-    return newDayId; // Возвращаем ID нового дня
+    return newDayId;
 };
+
 // ─── CRUD для расходов ─────────────────────────
 interface newExpense {
     time: string;
-    category: string;
+    category: string | null;
     description: string;
     cost: number;
-    location: string;
+    location: string | null;
     affect: boolean;
 }
 
@@ -141,10 +137,15 @@ export const addExpense = async (expense: newExpense, dayId: number) => {
             dayId,
         ]
     );
+
+    await recalculateSums(dayId); // 🔧 обновить суммы
 };
 
 export const updateExpense = async (id: number, updated: Partial<IExpense>) => {
     if (!db) return;
+
+    const old = await db.getFirstAsync<IExpense>(`SELECT * FROM expenses WHERE id = ?`, [id]);
+    if (!old) return;
 
     const fields = Object.entries(updated)
         .filter(([_, v]) => v !== undefined)
@@ -154,12 +155,45 @@ export const updateExpense = async (id: number, updated: Partial<IExpense>) => {
     const values = Object.values(updated).map(v => (typeof v === 'boolean' ? +v : v));
 
     await db.runAsync(`UPDATE expenses SET ${fields} WHERE id = ?`, [...values, id]);
+
+    await recalculateSums(old.dayId); // 🔧 обновить суммы
 };
 
 export const deleteExpense = async (id: number) => {
     if (!db) return;
 
+    const existing = await db.getFirstAsync<IExpense>(`SELECT * FROM expenses WHERE id = ?`, [id]);
+    if (!existing) return;
+
     await db.runAsync(`DELETE FROM expenses WHERE id = ?`, [id]);
+
+    await recalculateSums(existing.dayId); // 🔧 обновить суммы
+};
+
+// 🔧 Пересчёт сумм после изменений
+export const recalculateSums = async (dayId: number) => {
+    if (!db) return;
+
+    const day = await db.getFirstAsync<{ monthId: number }>(
+        `SELECT monthId FROM days WHERE id = ?`,
+        [dayId]
+    );
+    if (!day) return;
+
+    // Получаем сумму расходов, которые влияют на бюджет
+    const { sum = 0 } = await db.getFirstAsync<{ sum: number }>(
+        `SELECT SUM(cost) as sum FROM expenses WHERE dayId = ? AND affect = 1`,
+        [dayId]
+    ) ?? {};
+
+    await db.runAsync(`UPDATE days SET expenseSum = ? WHERE id = ?`, [sum, dayId]);
+
+    const { monthSum = 0 } = await db.getFirstAsync<{ monthSum: number }>(
+        `SELECT SUM(expenseSum) as monthSum FROM days WHERE monthId = ?`,
+        [day.monthId]
+    ) ?? {};
+
+    await db.runAsync(`UPDATE months SET spent = ? WHERE id = ?`, [monthSum, day.monthId]);
 };
 
 // ─── Получение данных ─────────────────────────
@@ -193,7 +227,7 @@ export const getExpensesForDay = async (dayId: number): Promise<IExpense[]> => {
         [dayId]
     );
 
-    return rows.map(exp => ({ ...exp, affect: !!exp.affect })); // Преобразуем affect в boolean
+    return rows.map(exp => ({ ...exp, affect: !!exp.affect }));
 };
 
 export const deleteTwoMonths = async (id1: number, id2: number) => {
